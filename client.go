@@ -190,14 +190,26 @@ func (c *client) mainloop(ctx context.Context, params *LookupParams) {
 	// Iterate through channels from listeners goroutines
 	var entries, sentEntries map[string]*ServiceEntry
 	sentEntries = make(map[string]*ServiceEntry)
-
+	ticker := time.NewTicker(1 * time.Second)
 	for {
 		select {
 		case <-ctx.Done():
 			// Context expired. Notify subscriber that we are done here.
 			params.done()
+			ticker.Stop()
 			c.shutdown()
 			return
+
+		case timestamp := <-ticker.C:
+			for k, e := range sentEntries {
+				if e.expirationDate.Before(timestamp) {
+					delete(sentEntries, k)
+					delete(entries, k)
+					e.TTL = 0
+					params.Entries <- e
+				}
+			}
+
 		case msg := <-msgCh:
 			entries = make(map[string]*ServiceEntry)
 			sections := append(msg.Answer, msg.Ns...)
@@ -219,6 +231,7 @@ func (c *client) mainloop(ctx context.Context, params *LookupParams) {
 							params.Domain)
 					}
 					entries[rr.Ptr].TTL = rr.Hdr.Ttl
+					entries[rr.Ptr].expirationDate = time.Now().Add(time.Duration(entries[rr.Ptr].TTL) * time.Second)
 				case *dns.SRV:
 					if params.ServiceInstanceName() != "" && params.ServiceInstanceName() != rr.Hdr.Name {
 						continue
@@ -234,6 +247,7 @@ func (c *client) mainloop(ctx context.Context, params *LookupParams) {
 					entries[rr.Hdr.Name].HostName = rr.Target
 					entries[rr.Hdr.Name].Port = int(rr.Port)
 					entries[rr.Hdr.Name].TTL = rr.Hdr.Ttl
+					entries[rr.Hdr.Name].expirationDate = time.Now().Add(time.Duration(entries[rr.Hdr.Name].TTL) * time.Second)
 				case *dns.TXT:
 					if params.ServiceInstanceName() != "" && params.ServiceInstanceName() != rr.Hdr.Name {
 						continue
@@ -248,6 +262,7 @@ func (c *client) mainloop(ctx context.Context, params *LookupParams) {
 					}
 					entries[rr.Hdr.Name].Text = rr.Txt
 					entries[rr.Hdr.Name].TTL = rr.Hdr.Ttl
+					entries[rr.Hdr.Name].expirationDate = time.Now().Add(time.Duration(entries[rr.Hdr.Name].TTL) * time.Second)
 				}
 			}
 			// Associate IPs in a second round as other fields should be filled by now.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 )
 
 // ServiceRecord contains the basic description of a service, which contains instance name, service type & domain
@@ -99,12 +100,13 @@ func (l *LookupParams) disableProbing() {
 // used to answer multicast queries.
 type ServiceEntry struct {
 	ServiceRecord
-	HostName string   `json:"hostname"` // Host machine DNS name
-	Port     int      `json:"port"`     // Service Port
-	Text     []string `json:"text"`     // Service info served as a TXT record
-	TTL      uint32   `json:"ttl"`      // TTL of the service record
-	AddrIPv4 []net.IP `json:"-"`        // Host machine IPv4 address
-	AddrIPv6 []net.IP `json:"-"`        // Host machine IPv6 address
+	HostName       string   `json:"hostname"` // Host machine DNS name
+	Port           int      `json:"port"`     // Service Port
+	Text           []string `json:"text"`     // Service info served as a TXT record
+	TTL            uint32   `json:"ttl"`      // TTL of the service record
+	AddrIPv4       []net.IP `json:"-"`        // Host machine IPv4 address
+	AddrIPv6       []net.IP `json:"-"`        // Host machine IPv6 address
+	expirationDate time.Time
 }
 
 // NewServiceEntry constructs a ServiceEntry.
